@@ -2,6 +2,7 @@
 #include "jeu.h"
 
 int main(void) {
+    //test
     Jeu jeu;
 
     if (!initialiser_jeu(&jeu)) {
