@@ -23,7 +23,24 @@ typedef struct {
     int color;
 } Player;
 
+typedef struct  {
+    int x, y;
+    int taille;
+    int speed_x;
+    float vy;
+    int color;
+} Bulles;
+
+typedef struct  {
+    int x, y;
+    int taille;
+    int speed_x;
+    float vy;
+    int color;
+} Projectiles;
+
 // --- VARIABLES GLOBALES ---
+
 BITMAP *page;
 Player joueur;
 int tempoglobale = 15;
