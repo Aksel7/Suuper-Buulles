@@ -1,0 +1,107 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="Author" content="Peter Puck">
+   <meta name="GENERATOR" content="Mozilla/4.7 [en] (Win95; I) [Netscape]">
+   <meta name="Description" content="Direct X for Mingw32">
+   <meta name="KeyWords" content="directx, direct x, mingw32, ming, gcc, microsoft">
+   <title>Mingw32 and directx</title>
+</head>
+<body>
+
+<center>
+<h2>
+MINGW32 AND DIRECT X</h2></center>
+The original header files seems to work so the only problem is to update
+the lib files that means creating one static and some import libraries.
+Here is how I did it for directx 7 and how you can update it for common
+versions.
+<p><font size=+1>1. Copy all DEFINE_GUID definitions from the directx header
+files to dxguid.c this will become a static library and replace dxguid.lib
+from Microsoft. In dxguid.c should also the constants from dinput.h be
+defined.</font>
+<p><font size=+1>2. Create the import libs I tried to let reimp do this
+but it did not work all the way but running reimp -s > file.def gave me
+the symbols with parameter size. You will need to edit the def files slightly
+with an EXPORTS on top and perhaps deleting irrelevant garbage.</font>
+<p><font size=+1>3. I created a makefile this file must perhaps be updated
+in the future.</font>
+<p><font size=+1>4. Run make and place the libs in the compiler lib directory.</font>
+<p>As far as I know do mingw32 support all of directx in both C and C++
+with full COM support. My libs can of course miss a lot and the data for
+the new Mouse2 is probably wrong since I took it after some inspecting
+of dinput.lib with a dump tool. :-)
+<br>Some comments about using directx with mingw32:
+<ul>
+<li>
+C++ programs must be compiled with the -fvtable-thunks switch. Don't worry
+gcc will tell you if you forgot to use it. about 1000 times :-)</li>
+
+<li>
+d3d has a bad reputation&nbsp; I and many with me prefer open GL instead</li>
+
+<li>
+WINNT is defined despite I am running win95 this created problems with
+ddraw.h so I put an undef WINNT at top of it no guarantees that this is
+the way to solve&nbsp; it</li>
+
+<li>
+a lot of&nbsp; warnings about redefinition I haven't checked out why</li>
+
+<li>
+if you are compiling the examples from Microsoft's SDK&nbsp; (available
+at MSDN) don't forget to compile the .rc file with windres and link with
+it. For example "windres app.rc appres.o" creates appres.o and this file
+should be linked like the other .o files.</li>
+
+<li>
+windres can not compile all .rc files but in the DEBUG directory is it
+a precompiled .res file that windres can use. ("windres app.res appres.o")</li>
+
+<li>
+an alternative can be to use another&nbsp; resource compiler like the one
+from&nbsp; <a href="http://www.borland.com/bcppbuilder/freecompiler/">Borland</a>&nbsp;
+to create the .res file</li>
+
+<li>
+some SDK examples can not be compiled because of incomplete header files
+but if you download the&nbsp; <a href="http://www.borland.com/bcppbuilder/freecompiler/">Borland
+compiler</a>&nbsp; do you also get a more complete set of headers. If something
+is missing in the mingw32 headers can you search for it in the Borland
+headers (MS original) and update the mingw32 files.</li>
+
+<li>
+in many cases is it better to use allegro instead of directx directly (easier
+and portable) the windows version of allegro is using directx</li>
+
+<li>
+MSVC accepts non ANSI&nbsp; C++ this is common in the MSDN examples</li>
+
+<li>
+if an SDK example does not work properly is it probably because of some
+MSVC hack, do not assume something else unless you can compile and link
+with -Walll without getting any warnings</li>
+</ul>
+OK, enough of advises here is the&nbsp; <a href="dxlibs.zip">dxlibs</a>&nbsp;
+you must get the headers from Microsoft.
+<p>&nbsp;<a href="http://msdn.microsoft.com/directx/downloads.asp">Microsoft
+SDK for directx&nbsp;</a> (the full SDK is recommended but you only need
+to download the headers)
+<br>&nbsp;<a href="http://msdn.microsoft.com/library/default.asp?URL=/library/devprods\vs6\visualc/vcsample/vcsmpdirectx.htm">MS
+SDK examples&nbsp;</a>&nbsp; (and here is some simple&nbsp; <a href="sdkmakes.zip">makefiles</a>&nbsp;
+I have done for some of the examples)
+<br>&nbsp;<a href="http://www.ozemail.com.au/~peterhawkins/directx.html">Peter
+Hawkins original dirext 5.0 port</a>&nbsp; (my directx work is based on
+his port but the limitations is history)
+<br>&nbsp;<a href="http://www.ozemail.com.au/~peterhawkins/directx.html">John
+Fortins 6.0 port with the donuts example</a>&nbsp; (use&nbsp; <a href="makefile">this
+makefile</a>&nbsp; instead if you want to compile the donuts example on
+his page)
+<p>If you are interested in directx programming do I think that it would
+be great if you created a page with info and makefiles for the SDK examples
+with mingw32. That could certainly help a lot of people!
+<p>&nbsp;<a href="http://sites.netscape.net/zaqhaq/">back to main page</a>
+<br>&nbsp;
+</body>
+</html>

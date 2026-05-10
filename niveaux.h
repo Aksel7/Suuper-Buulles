@@ -1,7 +1,7 @@
 #ifndef NIVEAUX_H
 #define NIVEAUX_H
 
-#define NB_NIVEAUX 4
+#define NB_NIVEAUX      4
 #define MAX_BULLES_INIT 10
 #define MAX_SLIMES_INIT 5
 
@@ -14,46 +14,66 @@ typedef struct {
     float x, y;
     float vx, vy;
     float rayon;
-    int division;
-    int lance_eclairs;
+    int   division;
+    int   lance_eclairs;
 } BulleInit;
 
 typedef struct {
     float x, y;
     float vx, vy;
     float rayon;
-    int pv;
+    int   pv;
 } SlimeInit;
 
 typedef struct {
-    int active;
-    int delai_min_spawn;
-    int delai_max_spawn;
+    int   active;
+    int   delai_min_spawn;
+    int   delai_max_spawn;
     float vitesse_y;
     float rayon;
 } BouleFeuConfig;
 
 typedef struct {
-    int numero;
-    char nom[50];
-    char decor[100];
+    int    numero;
+    char   nom[50];
+    char   decor[100];
 
-    int temps_limite;
+    /* dimensions du niveau (en pixels) */
+    int    largeur;
+    int    hauteur;
+
+    int    temps_limite;
     ObjectifNiveau objectif;
 
-    int nb_bulles_initiales;
+    /* spawn joueur */
+    float  spawn_x;
+    float  spawn_y;
+
+    /* bulles */
+    int       nb_bulles_initiales;
     BulleInit bulles[MAX_BULLES_INIT];
 
-    int nb_slimes_initiales;
+    /* slimes */
+    int       nb_slimes_initiales;
     SlimeInit slimes[MAX_SLIMES_INIT];
 
+    /* boule de feu */
     BouleFeuConfig boule_feu;
 
-    int boss_present;
-    int pv_boss;
+    /* boss */
+    int   boss_present;
+    int   pv_boss;
+    float boss_spawn_x;
+    float boss_spawn_y;
 
 } NiveauConfig;
 
+/* Chargement */
 void charger_niveau(NiveauConfig *niveau, int numero);
 
-#endif
+/* Collision tuiles — à implémenter dans niveaux.c selon ta carte */
+int niveau_trouver_sol    (NiveauConfig *n, int x, int bas, int vy);
+int niveau_trouver_plafond(NiveauConfig *n, int x, int haut, int vy);
+int niveau_est_solide     (NiveauConfig *n, int x, int y);
+
+#endif /* NIVEAUX_H */

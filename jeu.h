@@ -2,37 +2,17 @@
 #define JEU_H
 
 #include <allegro.h>
-#include "niveaux.h"
-#include "graphismes.h"
-#include "boss.h"
+#include "types.h"
 
-#define LARGEUR_ECRAN 800
-#define HAUTEUR_ECRAN 600
-#define FPS 60
+/* =========================================================
+   JEU.H
+   jeu() : boucle de jeu complète.
+   Appelle logique.c (joueur/bulle/boss/niveau)
+   et graphique.c pour l'affichage.
+   Retourne quand le joueur revient au menu ou quitte.
+   ========================================================= */
 
-typedef enum {
-    ETAT_MENU,
-    ETAT_JEU,
-    ETAT_QUITTER
-} EtatProgramme;
+void jeu(BITMAP *buffer, Ressources *res,
+         const char *pseudo, int niveau_depart, int nb_joueurs);
 
-typedef struct {
-    EtatProgramme etat;
-
-    BITMAP *buffer;
-
-    RessourcesGraphiques ressources;
-    NiveauConfig niveau;
-    Boss boss;
-
-    int niveau_courant;
-    int frame;
-} Jeu;
-
-int initialiser_jeu(Jeu *jeu);
-void boucle_jeu(Jeu *jeu);
-void update_jeu(Jeu *jeu);
-void draw_jeu(Jeu *jeu);
-void liberer_jeu(Jeu *jeu);
-
-#endif
+#endif /* JEU_H */

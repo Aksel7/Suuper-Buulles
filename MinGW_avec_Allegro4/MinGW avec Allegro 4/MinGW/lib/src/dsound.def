@@ -1,0 +1,7 @@
+EXPORTS
+DirectSoundCaptureCreate@12
+DirectSoundCaptureEnumerateA@8
+DirectSoundCaptureEnumerateW@8
+DirectSoundCreate@12
+DirectSoundEnumerateA@8
+DirectSoundEnumerateW@8

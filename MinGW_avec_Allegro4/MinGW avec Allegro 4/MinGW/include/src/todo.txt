@@ -1,0 +1,7 @@
+Add a .diff against original Microsoft DirectX 7.0 SDK header files here.
+The patch should not include files not existant in this archive, in other words
+do not use the -N parameter with diff.
+
+In case the header files are not modified, rename this file to readme.txt and
+put in it an explanation that whoever modifies the original header files
+should leave a complete diff patch in this directory.

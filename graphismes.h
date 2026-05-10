@@ -1,61 +1,66 @@
-#ifndef GRAPHISMES_H
-#define GRAPHISMES_H
+#ifndef GRAPHIQUE_H
+#define GRAPHIQUE_H
 
 #include <allegro.h>
-#include "niveaux.h"
-#include "boss.h"
+#include <stdbool.h>
+#include "types.h"
 
-/*
-    Structure qui contient toutes les images du jeu.
+/* =========================================================
+   GRAPHIQUE.H — Couche d'affichage Allegro 4
+   Appelée par jeu.c et menu.c — jamais par logique.c
+   ========================================================= */
 
-    Pour l’instant :
-    - 1 image par entité
-    - pas encore d’animation
+/* Init & ressources */
+void graphique_init_allegro        (void);
+bool graphique_charger_ressources  (Ressources *res, const char *dossier);
+void graphique_liberer_ressources  (Ressources *res);
 
-    Plus tard, pour les animations, on pourra remplacer :
-    BITMAP *joueur;
-    par exemple par :
-    BITMAP *joueur_marche[4];
-*/
-typedef struct {
-    BITMAP *joueur;
-    BITMAP *bulle;
-    BITMAP *slime;
-    BITMAP *boule_feu;
-    BITMAP *boss;
+/* Utilitaires */
+void graphique_nettoyer_magenta    (BITMAP *bmp);
+void graphique_textout_stylise     (BITMAP *dest, const char *msg,
+                                    int x, int y, int taille,
+                                    int couleur, bool centre);
 
-    BITMAP *decor1;
-    BITMAP *decor2;
-    BITMAP *decor3;
-    BITMAP *decor4;
-} RessourcesGraphiques;
+/* ── Menus ─────────────────────────────────────────────── */
+void graphique_dessiner_menu_principal (BITMAP *buf, const Ressources *res,
+                                        const int hover[4]);
+void graphique_dessiner_menu_jouer     (BITMAP *buf, const Ressources *res,
+                                        const int hover[2], int hover_retour);
+void graphique_dessiner_ecran_texte    (BITMAP *buf, const Ressources *res,
+                                        EtatEcran etat, int hover_retour);
+void graphique_dessiner_saisie_pseudo  (BITMAP *buf, const Ressources *res,
+                                        const char *pseudo);
+void graphique_dessiner_choix_joueurs  (BITMAP *buf, const Ressources *res,
+                                        int mx, int my);
 
-/* Chargement / libération */
-void charger_ressources_graphiques(RessourcesGraphiques *res);
-void liberer_ressources_graphiques(RessourcesGraphiques *res);
+/* ── Jeu ───────────────────────────────────────────────── */
+void graphique_dessiner_jeu      (BITMAP *buf, const Ressources *res,
+                                   const Joueur *j,
+                                   const Joueur *j2,          /* NULL si 1 joueur */
+                                   const Bulle *bulles,
+                                   const Projectile *projs,
+                                   const Projectile *projs2,  /* NULL si 1 joueur */
+                                   const Eclair *eclairs,
+                                   const BonusItem *bonus,
+                                   const Boss *boss,
+                                   const Fireball *fireballs,
+                                   int nb_fireballs,
+                                   const EtatNiveau *niveau);
+void graphique_dessiner_hud      (BITMAP *buf, const Ressources *res,
+                                   const Joueur *j, const Joueur *j2,
+                                   const EtatNiveau *niveau);
+void graphique_dessiner_decompte (BITMAP *buf, const Ressources *res,
+                                   int valeur);
 
-/* Décor */
-BITMAP *obtenir_decor_niveau(RessourcesGraphiques *res, int numero_niveau);
-void dessiner_decor(BITMAP *buffer, RessourcesGraphiques *res, int numero_niveau);
+/* ── Écrans de fin ─────────────────────────────────────── */
+void graphique_dessiner_pause      (BITMAP *buf, const Ressources *res,
+                                    int hover[2]);
+void graphique_dessiner_fin_niveau (BITMAP *buf, const Ressources *res,
+                                    bool gagne, int score,
+                                    const char *pseudo, int hover[4]);
+void graphique_dessiner_victoire   (BITMAP *buf, const Ressources *res,
+                                    int score, const char *pseudo);
+void graphique_dessiner_game_over  (BITMAP *buf, const Ressources *res,
+                                    int score, int hover[2]);
 
-/* Entités simples */
-void dessiner_joueur(BITMAP *buffer, RessourcesGraphiques *res, int x, int y);
-void dessiner_bulle(BITMAP *buffer, RessourcesGraphiques *res, int x, int y, int rayon);
-void dessiner_slime(BITMAP *buffer, RessourcesGraphiques *res, int x, int y, int rayon);
-void dessiner_boule_feu(BITMAP *buffer, RessourcesGraphiques *res, int x, int y, int rayon);
-void dessiner_boss(BITMAP *buffer, RessourcesGraphiques *res, Boss *boss);
-
-/*
-    Fonction globale d’affichage d’un niveau.
-
-    Elle est appelée par jeu.c dans draw_jeu().
-    Plus tard, les animations seront ajoutées ici,
-    ou dans des fonctions appelées depuis ici.
-*/
-void afficher_niveau_graphique(BITMAP *buffer,
-                               RessourcesGraphiques *res,
-                               NiveauConfig *niveau,
-                               Boss *boss,
-                               int frame);
-
-#endif
+#endif /* GRAPHIQUE_H */

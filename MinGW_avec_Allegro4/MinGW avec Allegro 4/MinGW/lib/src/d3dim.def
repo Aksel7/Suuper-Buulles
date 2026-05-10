@@ -1,0 +1,8 @@
+EXPORTS
+Direct3DCreate@12
+Direct3D_HALCleanUp@8
+FlushD3DDevices2@4
+FlushD3DDevices@4
+PaletteAssociateNotify@16
+PaletteUpdateNotify@20
+SurfaceFlipNotify@4
