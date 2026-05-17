@@ -48,7 +48,12 @@ void logique_init_joueur(Joueur *j, const char *pseudo)
     j->invincible       = false;
     j->invincible_timer = 0;
     j->vivant           = true;
+    j->vies             = 3;       /* 3 vies au départ */
     j->score            = 0;
+    j->direction        = 1;
+    j->etat_anim        = JOUEUR_IDLE;
+    j->anim_frame       = 0;
+    j->anim_timer       = 0;
     strncpy(j->pseudo, pseudo, 31);
     j->pseudo[31] = '\0';
 }
@@ -235,17 +240,20 @@ int logique_compter_bulles(Bulle *liste)
 
 static TypeBonus choisir_bonus(int taille)
 {
-    int r = rand_local() % 10;
-    if (taille >= 3) {
-        if (r < 3) return BONUS_ARME_DOUBLE;
-        if (r < 5) return BONUS_ARME_TRIPLE;
-        if (r < 6) return BONUS_ARME_ECLAIR;
-        if (r < 7) return BONUS_TEMPS;
-    } else {
-        if (r < 2) return BONUS_INVINCIBLE;
-        if (r < 4) return BONUS_ARME_DOUBLE;
+    /* Drop seulement 30% du temps */
+    int chance = rand_local() % 10;
+    if (chance >= 3) return (TypeBonus)-1;  /* 70% pas de drop */
+
+    int r = rand_local() % 4;
+    /* Pas de champignon doré (BONUS_INVINCIBLE) dans les drops normaux */
+    switch (r) {
+        case 0: return BONUS_ARME_DOUBLE;
+        case 1: return BONUS_ARME_TRIPLE;
+        case 2: return BONUS_ARME_ECLAIR;
+        case 3: return BONUS_TEMPS;
+        default: return BONUS_ARME_DOUBLE;
     }
-    return (TypeBonus)-1;
+    (void)taille;
 }
 
 int logique_diviser_bulle(Bulle **liste, Bulle *cible,
@@ -337,19 +345,20 @@ BonusItem *logique_creer_bonus(float x, float y, TypeBonus type)
 
 void logique_update_bonus(BonusItem **liste)
 {
-    float sol = (float)GAME_H - 20.0f;
+    /* Le sol accessible = hauteur jeu - hauteur joueur - marge */
+    float sol = (float)(GAME_H - PLAYER_H - 10);
     BonusItem **cur = liste;
     while (*cur) {
         BonusItem *b = *cur;
         if (b->actif) {
-            /* gravité */
-            b->vy  += 0.3f;
-            b->y   += b->vy;
-            /* sol : rebond amorti */
+            /* gravité douce */
+            b->vy += 0.2f;
+            if (b->vy > 5.0f) b->vy = 5.0f;  /* vitesse max */
+            b->y  += b->vy;
+            /* sol : stop sans rebond */
             if (b->y >= sol) {
                 b->y  = sol;
-                b->vy = -b->vy * 0.4f;
-                if (b->vy > -0.5f) b->vy = 0.0f;
+                b->vy = 0.0f;
             }
             b->duree_vie--;
             if (b->duree_vie <= 0) b->actif = false;
@@ -371,11 +380,26 @@ void logique_liberer_bonus(BonusItem **liste)
 void logique_appliquer_bonus(Joueur *j, TypeBonus type, EtatNiveau *niveau)
 {
     switch (type) {
-        case BONUS_ARME_DOUBLE:  j->arme = ARME_DOUBLE; j->arme_timer = 15*FPS; break;
-        case BONUS_ARME_TRIPLE:  j->arme = ARME_TRIPLE; j->arme_timer = 12*FPS; break;
-        case BONUS_ARME_ECLAIR:  j->arme = ARME_ECLAIR; j->arme_timer = 10*FPS; break;
-        case BONUS_TEMPS:        if (niveau) niveau->temps_restant += 15;        break;
-        case BONUS_INVINCIBLE:   j->invincible = true; j->invincible_timer = 5*FPS; break;
+        case BONUS_ARME_DOUBLE:
+            /* Si on a déjà x3, on garde x3 mais on renouvelle la durée */
+            if (j->arme < ARME_DOUBLE) j->arme = ARME_DOUBLE;
+            j->arme_timer = 15 * FPS;
+            break;
+        case BONUS_ARME_TRIPLE:
+            j->arme       = ARME_TRIPLE;
+            j->arme_timer = 12 * FPS;
+            break;
+        case BONUS_ARME_ECLAIR:
+            j->arme       = ARME_ECLAIR;
+            j->arme_timer = 10 * FPS;
+            break;
+        case BONUS_TEMPS:
+            if (niveau) niveau->temps_restant += 15;
+            break;
+        case BONUS_INVINCIBLE:
+            j->invincible       = true;
+            j->invincible_timer = 5 * FPS;
+            break;
         default: break;
     }
 }
@@ -584,12 +608,16 @@ void logique_peupler_niveau(int numero, Bulle **bulles,
                              Boss *boss, Joueur *j)
 {
     Bulle *b1, *b2, *b3, *b4, *b5;
-    j->x      = WINDOW_W / 2.0f;
-    j->y      = GAME_H - PLAYER_H / 2.0f;
-    j->arme   = ARME_SIMPLE;
+    j->x          = WINDOW_W / 2.0f;
+    j->y          = GAME_H - PLAYER_H / 2.0f;
+    j->arme       = ARME_SIMPLE;
     j->arme_timer = 0;
     j->invincible = false;
-    j->vivant = true;
+    j->vivant     = true;
+
+    /* Régénérer une vie à chaque nouveau niveau (max 3) */
+    if (j->vies < 3) j->vies++;
+
     logique_liberer_bulles(bulles);
 
     switch (numero) {
