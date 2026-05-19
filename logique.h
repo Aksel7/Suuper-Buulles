@@ -48,7 +48,8 @@ bool logique_collision_rect_rect  (float ax, float ay, float aw, float ah,
 bool logique_tester_collisions    (Joueur *j, Projectile **projs,
                                    Bulle **bulles, Eclair **eclairs,
                                    BonusItem **bonus, Boss *boss,
-                                   int *score, int niveau);
+                                   int *score, int niveau,
+                                   EtatNiveau *etat_niveau);
 
 /* Niveau */
 void logique_init_niveau   (EtatNiveau *n, int numero);
@@ -65,10 +66,13 @@ void fireball_lancer     (Fireball *pool, int nb,
 void fireball_update     (Fireball *pool, int nb);
 int  fireball_touche_joueur(Fireball *pool, int nb, const Joueur *j);
 
-/* Sauvegarde */
-void logique_sauvegarder(const char *pseudo, int niveau, int score,
-                          const char *fichier);
-bool logique_charger    (const char *pseudo, int *niveau, int *score,
-                          const char *fichier);
+/* Sauvegarde — un fichier par joueur : <pseudo>.txt */
+int  logique_save_existe  (const char *pseudo);
+void logique_sauvegarder  (const char *pseudo, int niveau, int score,
+                            int nb_joueurs, int vies,
+                            const char *fichier_ignore);
+bool logique_charger       (const char *pseudo, int *niveau, int *score,
+                            int *nb_joueurs, int *vies,
+                            const char *fichier_ignore);
 
 #endif /* LOGIQUE_H */

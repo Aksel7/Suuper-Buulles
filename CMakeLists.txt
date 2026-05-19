@@ -11,7 +11,6 @@ add_executable(superpong
         niveaux.c niveaux.h
         jeu.c jeu.h
         graphismes.c graphismes.h
-        joueurs.c joueurs.h
         menu.c menu.h
         logique.c logique.h
         ihm.c ihm.h

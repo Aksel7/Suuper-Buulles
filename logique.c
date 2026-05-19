@@ -110,28 +110,22 @@ bool logique_tirer(Joueur *j, Projectile **liste, int *cooldown)
             *liste = logique_creer_projectile(cx, cy, ARME_SIMPLE);
             *cooldown = 18;
             break;
-        case ARME_DOUBLE: {
-            Projectile *p1 = logique_creer_projectile(cx - 12, cy, ARME_DOUBLE);
-            Projectile *p2 = logique_creer_projectile(cx + 12, cy, ARME_DOUBLE);
-            p1->suivant = p2;
-            *liste = p1;
-            *cooldown = 18;
+        case ARME_DOUBLE:
+            /* x2 : tir 2x plus rapide */
+            *liste = logique_creer_projectile(cx, cy, ARME_DOUBLE);
+            *cooldown = 9;
             break;
-        }
-        case ARME_TRIPLE: {
-            Projectile *p1 = logique_creer_projectile(cx - 16, cy, ARME_TRIPLE);
-            Projectile *p2 = logique_creer_projectile(cx,      cy, ARME_TRIPLE);
-            Projectile *p3 = logique_creer_projectile(cx + 16, cy, ARME_TRIPLE);
-            p1->suivant = p2; p2->suivant = p3;
-            *liste = p1;
-            *cooldown = 15;
+        case ARME_TRIPLE:
+            /* x3 : tir 3x plus rapide */
+            *liste = logique_creer_projectile(cx, cy, ARME_TRIPLE);
+            *cooldown = 6;
             break;
-        }
         case ARME_ECLAIR: {
+            /* Attaque géante — grosse fireball vers le haut */
             Projectile *p = logique_creer_projectile(cx, cy, ARME_ECLAIR);
-            p->vy  = -(float)(PROJ_SPEED + 4);
-            *liste = p;
-            *cooldown = 25;
+            p->vy = -(float)(PROJ_SPEED + 8);  /* très rapide */
+            *liste    = p;
+            *cooldown = 35;  /* plus lent à recharger */
             break;
         }
     }
@@ -477,7 +471,8 @@ bool logique_collision_rect_rect(float ax, float ay, float aw, float ah,
 bool logique_tester_collisions(Joueur *j, Projectile **projs,
                                 Bulle **bulles, Eclair **eclairs,
                                 BonusItem **bonus, Boss *boss,
-                                int *score_gagne, int niveau)
+                                int *score_gagne, int niveau,
+                                EtatNiveau *etat_niveau)
 {
     float jx = j->x - PLAYER_W/2.0f;
     float jy = j->y - PLAYER_H;
@@ -494,19 +489,45 @@ bool logique_tester_collisions(Joueur *j, Projectile **projs,
     p = *projs;
     while (p) {
         if (p->actif) {
-            b = *bulles;
-            while (b) {
-                if (b->active) {
-                    float r = bulle_rayon(b->taille);
-                    if (logique_collision_cercle_rect(b->x, b->y, r,
-                            p->x, p->y, (float)PROJ_W, (float)PROJ_H)) {
-                        p->actif = false;
-                        *score_gagne += logique_diviser_bulle(bulles, b,
-                                                               bonus, niveau);
-                        break;
+            float pw, ph, px2, py2;
+            if (p->type == ARME_ECLAIR) {
+                /* fireball géante — traverse tout, p->x/y = centre */
+                pw = 44.0f; ph = 44.0f;
+                px2 = p->x - pw/2;
+                py2 = p->y - ph/2;
+                b = *bulles;
+                while (b) {
+                    if (b->active) {
+                        float r = bulle_rayon(b->taille);
+                        if (logique_collision_cercle_rect(b->x, b->y, r,
+                                px2, py2, pw, ph)) {
+                            /* NE PAS désactiver p — continue de traverser */
+                            *score_gagne += logique_diviser_bulle(bulles, b,
+                                                                   bonus, niveau);
+                        }
                     }
+                    b = b->suivante;
                 }
-                b = b->suivante;
+            } else {
+                /* kunai normal — s'arrête au premier contact */
+                pw = (float)PROJ_W;
+                ph = (float)PROJ_H;
+                px2 = p->x - pw/2;
+                py2 = p->y;
+                b = *bulles;
+                while (b) {
+                    if (b->active) {
+                        float r = bulle_rayon(b->taille);
+                        if (logique_collision_cercle_rect(b->x, b->y, r,
+                                px2, py2, pw, ph)) {
+                            p->actif = false;
+                            *score_gagne += logique_diviser_bulle(bulles, b,
+                                                                   bonus, niveau);
+                            break;
+                        }
+                    }
+                    b = b->suivante;
+                }
             }
         }
         p = p->suivant;
@@ -569,7 +590,7 @@ bool logique_tester_collisions(Joueur *j, Projectile **projs,
         if (bon->actif &&
             logique_collision_rect_rect(bon->x-16, bon->y-16, 32, 32,
                 jx, jy, jw, jh)) {
-            logique_appliquer_bonus(j, bon->type, NULL);
+            logique_appliquer_bonus(j, bon->type, etat_niveau);
             bon->actif = false;
         }
         bon = bon->suivant;
@@ -615,8 +636,8 @@ void logique_peupler_niveau(int numero, Bulle **bulles,
     j->invincible = false;
     j->vivant     = true;
 
-    /* Régénérer une vie à chaque nouveau niveau (max 3) */
-    if (j->vies < 3) j->vies++;
+    /* Régénérer une vie à chaque NOUVEAU niveau (pas au premier chargement) */
+    if (numero > 1 && j->vies < 3) j->vies++;
 
     logique_liberer_bulles(bulles);
 
@@ -749,63 +770,67 @@ int fireball_touche_joueur(Fireball *pool, int nb, const Joueur *j)
 }
 
 /* =========================================================
-   SAUVEGARDE
+   SAUVEGARDE — un fichier par joueur : <pseudo>.txt
+   Format clé=valeur
    ========================================================= */
 
-void logique_sauvegarder(const char *pseudo, int niveau,
-                          int score, const char *fichier)
+static void nom_fichier_save(char *out, const char *pseudo)
 {
-    Sauvegarde saves[MAX_SAUVEGARDES];
-    int nb = 0, i;
-    bool trouve = false;
-    FILE *f = fopen(fichier, "r");
-    if (f) {
-        while (nb < MAX_SAUVEGARDES &&
-               fscanf(f, "%31s %d %d",
-                      saves[nb].pseudo,
-                      &saves[nb].dernier_niveau,
-                      &saves[nb].meilleur_score) == 3)
-            nb++;
-        fclose(f);
-    }
-    for (i = 0; i < nb; i++) {
-        if (strcmp(saves[i].pseudo, pseudo) == 0) {
-            if (niveau > saves[i].dernier_niveau)
-                saves[i].dernier_niveau = niveau;
-            if (score > saves[i].meilleur_score)
-                saves[i].meilleur_score = score;
-            trouve = true; break;
-        }
-    }
-    if (!trouve && nb < MAX_SAUVEGARDES) {
-        strncpy(saves[nb].pseudo, pseudo, 31);
-        saves[nb].dernier_niveau = niveau;
-        saves[nb].meilleur_score = score;
-        nb++;
-    }
+    snprintf(out, 256, "%s.txt", pseudo);
+}
+
+int logique_save_existe(const char *pseudo)
+{
+    char fichier[256];
+    FILE *f;
+    nom_fichier_save(fichier, pseudo);
+    f = fopen(fichier, "r");
+    if (f) { fclose(f); return 1; }
+    return 0;
+}
+
+void logique_sauvegarder(const char *pseudo, int niveau,
+                          int score, int nb_joueurs, int vies,
+                          const char *fichier_ignore)
+{
+    char fichier[256];
+    FILE *f;
+    (void)fichier_ignore;
+    nom_fichier_save(fichier, pseudo);
     f = fopen(fichier, "w");
-    if (f) {
-        for (i = 0; i < nb; i++)
-            fprintf(f, "%s %d %d\n",
-                    saves[i].pseudo,
-                    saves[i].dernier_niveau,
-                    saves[i].meilleur_score);
-        fclose(f);
-    }
+    if (!f) return;
+    fprintf(f, "pseudo=%s\n",     pseudo);
+    fprintf(f, "niveau=%d\n",     niveau);
+    fprintf(f, "score=%d\n",      score);
+    fprintf(f, "nb_joueurs=%d\n", nb_joueurs);
+    fprintf(f, "vies=%d\n",       vies);
+    fclose(f);
 }
 
 bool logique_charger(const char *pseudo, int *niveau,
-                     int *score, const char *fichier)
+                     int *score, int *nb_joueurs, int *vies,
+                     const char *fichier_ignore)
 {
-    char buf[32];
-    int  niv, sc;
-    FILE *f = fopen(fichier, "r");
+    char fichier[256];
+    char ligne[128];
+    FILE *f;
+    (void)fichier_ignore;
+    nom_fichier_save(fichier, pseudo);
+    f = fopen(fichier, "r");
     if (!f) return false;
-    while (fscanf(f, "%31s %d %d", buf, &niv, &sc) == 3) {
-        if (strcmp(buf, pseudo) == 0) {
-            *niveau = niv; *score = sc;
-            fclose(f); return true;
+    *niveau     = 1;
+    *score      = 0;
+    *nb_joueurs = 1;
+    *vies       = 3;
+    while (fgets(ligne, sizeof(ligne), f)) {
+        char cle[64], val[64];
+        if (sscanf(ligne, "%63[^=]=%63s", cle, val) == 2) {
+            if (strcmp(cle, "niveau")     == 0) *niveau     = atoi(val);
+            if (strcmp(cle, "score")      == 0) *score      = atoi(val);
+            if (strcmp(cle, "nb_joueurs") == 0) *nb_joueurs = atoi(val);
+            if (strcmp(cle, "vies")       == 0) *vies       = atoi(val);
         }
     }
-    fclose(f); return false;
+    fclose(f);
+    return true;
 }

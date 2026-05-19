@@ -2,10 +2,11 @@
  *  jeu.c  —  Boucle de jeu
  *  Appelé par menu()
  *  Appelle : logique.c (joueur/bulle/boss/niveau)
- *            graphique.c (affichage)
+ *            graphismes.c (affichage)
  * ========================================================= */
 
 #include <allegro.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -33,17 +34,17 @@ static int zone_hover(Zone z, int mx, int my)
 }
 
 void jeu(BITMAP *buffer, Ressources *res,
-         const char *pseudo, int niveau_depart, int nb_joueurs)
+         const char *pseudo, int niveau_depart,
+         int nb_joueurs, int vies_depart, int score_depart)
 {
     int i;
 
-    /* ── Entités ─────────────────────────────────────────── */
-    Joueur     joueur;     /* J1 — ZQSD + ESPACE            */
-    Joueur     joueur2;    /* J2 — flèches + souris (2P)    */
+    Joueur     joueur;
+    Joueur     joueur2;
     EtatNiveau niveau;
     Bulle     *bulles  = NULL;
     Projectile *projs  = NULL;
-    Projectile *projs2 = NULL;   /* projectiles J2 */
+    Projectile *projs2 = NULL;
     Eclair    *eclairs = NULL;
     BonusItem *bonus   = NULL;
     Boss       boss;
@@ -59,12 +60,17 @@ void jeu(BITMAP *buffer, Ressources *res,
 
     /* ── Init ────────────────────────────────────────────── */
     logique_init_joueur(&joueur, pseudo);
-    joueur.id = 0;
-    joueur.x  = WINDOW_W / 4.0f;   /* J1 côté gauche */
+    joueur.id    = 0;
+    joueur.x     = WINDOW_W / 4.0f;
+    joueur.vies  = (vies_depart > 0 && vies_depart <= 3) ? vies_depart : 3;
+    joueur.score = score_depart;
 
     logique_init_joueur(&joueur2, "Joueur 2");
-    joueur2.id = 1;
-    joueur2.x  = 3.0f * WINDOW_W / 4.0f;   /* J2 côté droit */
+    joueur2.id               = 1;
+    joueur2.x                = 3.0f * WINDOW_W / 4.0f;
+    joueur2.vies             = joueur.vies;
+    joueur2.invincible       = true;
+    joueur2.invincible_timer = 3 * FPS;
 
     logique_init_niveau(&niveau, niveau_depart);
     boss_actif = (niveau_depart == NB_NIVEAUX);
@@ -83,10 +89,8 @@ void jeu(BITMAP *buffer, Ressources *res,
         if (joueur.tir_cooldown  > 0) joueur.tir_cooldown--;
         if (joueur2.tir_cooldown > 0) joueur2.tir_cooldown--;
 
-        /* ── Logique ───────────────────────────────────── */
         switch (etat) {
 
-            /* ══ JEU ══════════════════════════════════════ */
             case J_JEU: {
                 int  score_gagne;
                 bool mort, bulles_ok, boss_ok, temps_ecoule;
@@ -102,9 +106,9 @@ void jeu(BITMAP *buffer, Ressources *res,
                     etat = J_PAUSE; cd.clic = 20; break;
                 }
 
-                /* ── J1 : ZQSD + ESPACE ────────────────── */
+                /* ── J1 : A=gauche  D=droite  ESPACE=tir ── */
                 {
-                    bool g1 = key[KEY_Q];
+                    bool g1 = key[KEY_A];
                     bool d1 = key[KEY_D];
                     logique_deplacer_joueur(&joueur, g1, d1);
                     logique_update_joueur(&joueur);
@@ -121,15 +125,15 @@ void jeu(BITMAP *buffer, Ressources *res,
                     }
                 }
 
-                /* ── J2 : flèches + clic souris ─────────── */
+                /* ── J2 : fleches + tir ─────────────────── */
                 if (nb_joueurs == 2 && joueur2.vivant) {
                     bool g2 = key[KEY_LEFT];
                     bool d2 = key[KEY_RIGHT];
                     logique_deplacer_joueur(&joueur2, g2, d2);
                     logique_update_joueur(&joueur2);
 
-                    /* tir J2 : clic gauche souris */
-                    if ((mouse_b & 1) && joueur2.tir_cooldown == 0) {
+                    /* tir J2 : touche detectee = 74 */
+                    if (key[74] && joueur2.tir_cooldown == 0) {
                         Projectile *nouveau = NULL;
                         if (logique_tirer(&joueur2, &nouveau,
                                           &joueur2.tir_cooldown)) {
@@ -141,7 +145,7 @@ void jeu(BITMAP *buffer, Ressources *res,
                     }
                 }
 
-                /* bulles / éclairs / bonus / boss */
+                /* bulles / eclairs / bonus / boss */
                 logique_update_projectiles(&projs);
                 if (nb_joueurs == 2)
                     logique_update_projectiles(&projs2);
@@ -170,7 +174,6 @@ void jeu(BITMAP *buffer, Ressources *res,
                                         joueur.x, joueur.y, 4.0f);
                 }
 
-                /* update + collision fireballs */
                 fireball_update(fireballs, MAX_FIREBALLS);
                 if (!joueur.invincible &&
                     fireball_touche_joueur(fireballs, MAX_FIREBALLS, &joueur))
@@ -184,7 +187,7 @@ void jeu(BITMAP *buffer, Ressources *res,
                 mort = logique_tester_collisions(
                     &joueur, &projs, &bulles, &eclairs,
                     &bonus, boss_actif ? &boss : NULL,
-                    &score_gagne, niveau.numero);
+                    &score_gagne, niveau.numero, &niveau);
                 joueur.score += score_gagne;
 
                 /* collisions J2 */
@@ -193,9 +196,9 @@ void jeu(BITMAP *buffer, Ressources *res,
                     bool mort2 = logique_tester_collisions(
                         &joueur2, &projs2, &bulles, &eclairs,
                         &bonus, boss_actif ? &boss : NULL,
-                        &score2, niveau.numero);
+                        &score2, niveau.numero, &niveau);
                     joueur2.score += score2;
-                    joueur.score  += score2;   /* score partagé */
+                    joueur.score  += score2;
                     if (mort2) joueur2.vivant = false;
                 }
 
@@ -203,32 +206,28 @@ void jeu(BITMAP *buffer, Ressources *res,
                 if (mort || (nb_joueurs == 1 && !joueur.vivant) ||
                     (nb_joueurs == 2 && !joueur.vivant && !joueur2.vivant)) {
 
-                    /* perdre une vie */
                     joueur.vies--;
                     if (nb_joueurs == 2) joueur2.vies--;
 
                     if (joueur.vies <= 0) {
-                        /* plus de vies → game over */
                         etat = J_GAME_OVER;
                         hover_go[0] = hover_go[1] = 0;
                         cd.clic = 30; break;
                     } else {
-                        /* encore des vies → respawn sur le même niveau */
-                        joueur.vivant     = true;
-                        joueur.invincible = true;
-                        joueur.invincible_timer = 3 * FPS; /* 3s invincible */
-                        joueur.x = WINDOW_W / 2.0f;
-                        joueur.y = GAME_H - PLAYER_H / 2.0f;
+                        joueur.vivant           = true;
+                        joueur.invincible       = true;
+                        joueur.invincible_timer = 3 * FPS;
+                        joueur.x  = WINDOW_W / 2.0f;
+                        joueur.y  = GAME_H - PLAYER_H / 2.0f;
                         joueur.vx = 0;
                         if (nb_joueurs == 2) {
-                            joueur2.vivant     = true;
-                            joueur2.invincible = true;
+                            joueur2.vivant           = true;
+                            joueur2.invincible       = true;
                             joueur2.invincible_timer = 3 * FPS;
-                            joueur2.x = 3.0f * WINDOW_W / 4.0f;
-                            joueur2.y = GAME_H - PLAYER_H / 2.0f;
+                            joueur2.x  = 3.0f * WINDOW_W / 4.0f;
+                            joueur2.y  = GAME_H - PLAYER_H / 2.0f;
                             joueur2.vx = 0;
                         }
-                        /* vider projectiles */
                         logique_liberer_projectiles(&projs);
                         logique_liberer_projectiles(&projs2);
                         fireball_init_pool(fireballs, MAX_FIREBALLS);
@@ -246,7 +245,6 @@ void jeu(BITMAP *buffer, Ressources *res,
                     cd.clic = 30; break;
                 }
 
-                /* chrono */
                 temps_ecoule = logique_update_niveau(&niveau);
                 if (temps_ecoule) {
                     niveau.gagne = false;
@@ -257,7 +255,6 @@ void jeu(BITMAP *buffer, Ressources *res,
                 break;
             }
 
-            /* ══ PAUSE ═════════════════════════════════════ */
             case J_PAUSE: {
                 Zone zr = { WINDOW_W/2-130, 380, 260, 55 };
                 Zone zm = { WINDOW_W/2-130, 470, 260, 55 };
@@ -273,7 +270,6 @@ void jeu(BITMAP *buffer, Ressources *res,
                 break;
             }
 
-            /* ══ FIN NIVEAU ════════════════════════════════ */
             case J_FIN_NIVEAU: {
                 Zone zones[4] = {
                     { WINDOW_W/2-120, 370,       240, 50 },
@@ -291,7 +287,8 @@ void jeu(BITMAP *buffer, Ressources *res,
                     etat = J_QUITTER;
                 } else if (hover_fin[1]) {
                     logique_sauvegarder(joueur.pseudo, niveau.numero,
-                                        joueur.score, "sauvegardes.txt");
+                                        joueur.score, nb_joueurs,
+                                        joueur.vies, NULL);
                     allegro_message("Partie sauvegardee !");
                     cd.clic = 20;
                 } else if (hover_fin[2]) {
@@ -333,16 +330,15 @@ void jeu(BITMAP *buffer, Ressources *res,
                 break;
             }
 
-            /* ══ VICTOIRE ══════════════════════════════════ */
             case J_VICTOIRE:
                 if (entrees.entree || entrees.clic_gauche) {
                     logique_sauvegarder(joueur.pseudo, NB_NIVEAUX,
-                                        joueur.score, "sauvegardes.txt");
+                                        joueur.score, nb_joueurs,
+                                        joueur.vies, NULL);
                     etat = J_MENU; cd.clic = 20;
                 }
                 break;
 
-            /* ══ GAME OVER ═════════════════════════════════ */
             case J_GAME_OVER: {
                 Zone zr = { WINDOW_W/2-130, 450, 260, 50 };
                 Zone zm = { WINDOW_W/2-130, 530, 260, 50 };
@@ -373,7 +369,7 @@ void jeu(BITMAP *buffer, Ressources *res,
             default: break;
         }
 
-        /* ── Rendu (graphique.c) ───────────────────────── */
+        /* ── Rendu ───────────────────────────────────────── */
         clear_to_color(buffer, makecol(0, 0, 0));
         switch (etat) {
             case J_JEU:
@@ -417,7 +413,7 @@ void jeu(BITMAP *buffer, Ressources *res,
         rest(1000 / FPS);
     }
 
-    /* ── Libération ─────────────────────────────────────── */
+    /* ── Liberation ─────────────────────────────────────── */
     logique_liberer_bulles(&bulles);
     logique_liberer_projectiles(&projs);
     logique_liberer_projectiles(&projs2);

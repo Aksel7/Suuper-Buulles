@@ -120,8 +120,30 @@ void menu(BITMAP *buffer, Ressources *res)
 
             case M_PSEUDO:
                 if (ihm_saisir_pseudo(pseudo, 32, &entrees)) {
-                    etat = M_NB_JOUEURS;   /* choix nb joueurs avant lancer */
-                    cd.clic = 20;
+                    if (!charger_save) {
+                        /* Nouvelle partie : vérifier si le nom existe déjà */
+                        if (logique_save_existe(pseudo)) {
+                            allegro_message(
+                                "Le nom '%s' existe deja !\n"
+                                "Choisissez un autre nom ou\n"
+                                "utilisez 'Charger' pour reprendre.", pseudo);
+                            pseudo[0] = '\0';  /* vider et recommencer */
+                        } else {
+                            etat = M_NB_JOUEURS;
+                            cd.clic = 20;
+                        }
+                    } else {
+                        /* Charger : vérifier que la save existe */
+                        if (!logique_save_existe(pseudo)) {
+                            allegro_message(
+                                "Aucune sauvegarde pour '%s'.\n"
+                                "Verifiez le nom ou creez une nouvelle partie.", pseudo);
+                            pseudo[0] = '\0';
+                        } else {
+                            etat = M_LANCER;
+                            cd.clic = 20;
+                        }
+                    }
                 }
                 if (entrees.echap) {
                     etat      = M_PRINCIPAL;
@@ -130,7 +152,6 @@ void menu(BITMAP *buffer, Ressources *res)
                 break;
 
             case M_NB_JOUEURS: {
-                /* Zones cliquables : 1 joueur / 2 joueurs / retour */
                 int cx = WINDOW_W / 2;
                 int y1 = 280, y2 = 380, yr = 500;
                 int bw = 300, bh = 70;
@@ -151,28 +172,26 @@ void menu(BITMAP *buffer, Ressources *res)
             }
 
             case M_LANCER: {
-                /* ── Résoudre niveau de départ ──────────── */
                 int niveau_depart = 1;
+                int vies_depart   = 3;
+                int score_depart  = 0;
                 if (charger_save) {
-                    int niv_save = 1, score_save = 0;
+                    int niv_save = 1, score_save = 0, nb_j_save = 1, vies_save = 3;
                     if (logique_charger(pseudo, &niv_save,
-                                        &score_save, "sauvegardes.txt")) {
-                        niveau_depart = niv_save;
-                    } else {
-                        allegro_message(
-                            "Aucune sauvegarde pour '%s'.\n"
-                            "Nouvelle partie niveau 1.", pseudo);
+                                        &score_save, &nb_j_save, &vies_save, NULL)) {
+                        niveau_depart = niv_save + 1;
+                        if (niveau_depart > NB_NIVEAUX)
+                            niveau_depart = NB_NIVEAUX;
+                        nb_joueurs   = nb_j_save;
+                        vies_depart  = vies_save;
+                        score_depart = score_save;
                     }
                 }
-                /* ── Lancer le jeu ─────────────────────── */
-                jeu(buffer, res, pseudo, niveau_depart, nb_joueurs);
-                /* Retour au menu après la partie */
+                jeu(buffer, res, pseudo, niveau_depart, nb_joueurs, vies_depart, score_depart);
                 etat    = M_PRINCIPAL;
                 cd.clic = 30;
                 break;
             }
-
-            default: break;
         }
 
         /* ── Rendu menu (graphique.c) ────────────────────── */

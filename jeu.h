@@ -13,6 +13,7 @@
    ========================================================= */
 
 void jeu(BITMAP *buffer, Ressources *res,
-         const char *pseudo, int niveau_depart, int nb_joueurs);
+         const char *pseudo, int niveau_depart,
+         int nb_joueurs, int vies_depart, int score_depart);
 
 #endif /* JEU_H */

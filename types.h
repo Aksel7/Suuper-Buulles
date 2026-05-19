@@ -192,6 +192,7 @@ typedef struct {
     char pseudo[32];
     int  dernier_niveau;
     int  meilleur_score;
+    int  nb_joueurs;
 } Sauvegarde;
 
 /* ---------------------------------------------------------

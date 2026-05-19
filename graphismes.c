@@ -34,7 +34,7 @@ void graphique_nettoyer_magenta(BITMAP *bmp)
     for (y = 0; y < bmp->h; y++)
         for (x = 0; x < bmp->w; x++) {
             int c = getpixel(bmp, x, y);
-            if (getr(c) > 150 && getb(c) > 150 && getg(c) < 120)
+            if (getr(c) > 180 && getb(c) > 180 && getg(c) < 90)
                 putpixel(bmp, x, y, makecol(255, 0, 255));
         }
 }
@@ -411,13 +411,38 @@ static void dessiner_joueur_sprite(BITMAP *buf, const Ressources *res,
 static void dessiner_projectiles(BITMAP *buf, const Ressources *res,
                                   const Projectile *p)
 {
+    static int anim = 0;
+    anim++;
     for (;p;p=p->suivant) {
+        int px, py;
         if (!p->actif) continue;
-        if (res->kunai)
-            dessiner_image(buf,res->kunai,(int)p->x,(int)p->y,PROJ_W,PROJ_H);
-        else {
-            int px2=(int)p->x+PROJ_W/2;
-            line(buf,px2,(int)p->y,px2,(int)p->y+PROJ_H,makecol(200,200,200));
+        px = (int)p->x - PROJ_W/2;
+        py = (int)p->y;
+
+        if (p->type == ARME_ECLAIR) {
+            /* Attaque géante — fireball 48x48 */
+            int fa = (anim/4) % 4;
+            int gw = 48, gh = 48;
+            int gx = (int)p->x - gw/2;
+            int gy = (int)p->y - gh/2;
+            if (res->fireball[fa])
+                dessiner_image(buf, res->fireball[fa], gx, gy, gw, gh);
+            else {
+                /* fallback procédural : grande boule de feu */
+                circlefill(buf, (int)p->x, (int)p->y, 22, makecol(255,140,0));
+                circlefill(buf, (int)p->x, (int)p->y, 14, makecol(255,220,50));
+                circlefill(buf, (int)p->x, (int)p->y,  7, makecol(255,255,200));
+                circle(buf,     (int)p->x, (int)p->y, 23, makecol(200,50,0));
+            }
+        } else {
+            /* Kunai normal */
+            if (res->kunai)
+                dessiner_image(buf, res->kunai, px, py, PROJ_W, PROJ_H);
+            else {
+                int cx2 = px + PROJ_W/2;
+                line(buf, cx2, py, cx2, py+PROJ_H, makecol(200,200,200));
+                triangle(buf, cx2-3, py+4, cx2+3, py+4, cx2, py, makecol(180,180,50));
+            }
         }
     }
 }
@@ -550,6 +575,36 @@ void graphique_dessiner_hud(BITMAP *buf, const Ressources *res,
         rectfill(buf, hx+6, hy2+14, hx+10, hy2+18, col);
     }
 
+    /* Bonus actif J1 — icône + barre durée */
+    if (j->arme != ARME_SIMPLE && j->arme_timer > 0) {
+        const char *noms_arme[] = {"", "x2", "x3", "ZAP"};
+        int cols_arme[] = {0, makecol(80,180,255), makecol(80,255,120), makecol(255,220,0)};
+        int bx2 = 100;
+        int by2 = hy + 48;
+        /* Icône sprite si dispo */
+        int idx = j->arme - 1;  /* 0=double, 1=triple, 2=eclair */
+        if (idx >= 0 && idx < NB_TYPES_BONUS && res->bonus[idx])
+            dessiner_image(buf, res->bonus[idx], bx2, by2, 24, 24);
+        else {
+            rectfill(buf, bx2, by2, bx2+24, by2+24, cols_arme[j->arme]);
+            graphique_textout_stylise(buf, noms_arme[j->arme],
+                                      bx2+12, by2+6, 2, makecol(0,0,0), true);
+        }
+        /* Barre de durée */
+        {
+            int max_t = (j->arme==ARME_DOUBLE)?15*FPS:(j->arme==ARME_TRIPLE)?12*FPS:10*FPS;
+            int barre_w = 60;
+            int rempli  = (j->arme_timer * barre_w) / max_t;
+            rectfill(buf, bx2+28, by2+8,  bx2+28+barre_w, by2+18, makecol(40,40,40));
+            rectfill(buf, bx2+28, by2+8,  bx2+28+rempli,  by2+18, cols_arme[j->arme]);
+            rect(buf,     bx2+28, by2+8,  bx2+28+barre_w, by2+18, makecol(200,200,200));
+        }
+    }
+    if (j->invincible && j->invincible_timer > 0) {
+        graphique_textout_stylise(buf, "INVINCIBLE", 100, hy+48, 2,
+                                  makecol(255,200,255), false);
+    }
+
     /* Centre */
     col_temps=(niveau->temps_restant<=15)?makecol(255,80,80):makecol(255,255,255);
     snprintf(tmp,sizeof(tmp),"TEMPS: %d",niveau->temps_restant);
@@ -574,6 +629,29 @@ void graphique_dessiner_hud(BITMAP *buf, const Ressources *res,
             rectfill(buf, hx+2, hy2+10, hx+14, hy2+14, col);
             rectfill(buf, hx+4, hy2+12, hx+12, hy2+16, col);
             rectfill(buf, hx+6, hy2+14, hx+10, hy2+18, col);
+        }
+        /* Bonus actif J2 */
+        if (j2->arme != ARME_SIMPLE && j2->arme_timer > 0) {
+            const char *noms_arme2[] = {"", "x2", "x3", "ZAP"};
+            int cols_arme2[] = {0, makecol(80,180,255), makecol(80,255,120), makecol(255,220,0)};
+            int bx2 = WINDOW_W - 220 + 90;
+            int by2 = hy + 48;
+            int idx2 = j2->arme - 1;
+            if (idx2 >= 0 && idx2 < NB_TYPES_BONUS && res->bonus[idx2])
+                dessiner_image(buf, res->bonus[idx2], bx2, by2, 24, 24);
+            else {
+                rectfill(buf, bx2, by2, bx2+24, by2+24, cols_arme2[j2->arme]);
+                graphique_textout_stylise(buf, noms_arme2[j2->arme],
+                                          bx2+12, by2+6, 2, makecol(0,0,0), true);
+            }
+            {
+                int max_t2 = (j2->arme==ARME_DOUBLE)?15*FPS:(j2->arme==ARME_TRIPLE)?12*FPS:10*FPS;
+                int barre_w2 = 60;
+                int rempli2  = (j2->arme_timer * barre_w2) / max_t2;
+                rectfill(buf, bx2+28, by2+8,  bx2+28+barre_w2, by2+18, makecol(40,40,40));
+                rectfill(buf, bx2+28, by2+8,  bx2+28+rempli2,  by2+18, cols_arme2[j2->arme]);
+                rect(buf,     bx2+28, by2+8,  bx2+28+barre_w2, by2+18, makecol(200,200,200));
+            }
         }
         if (!j2->vivant)
             graphique_textout_stylise(buf,"MORT",WINDOW_W-220,hy+68,2,makecol(255,60,60),false);
